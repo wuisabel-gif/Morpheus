@@ -10,19 +10,6 @@ averaged number that hides the tail.
 
 ---
 
-> ⚠️ **Status / honesty note.** The numbers in this README are **illustrative placeholders**
-> from the project design. Replace each one with output from your own runs (`./reproduce.sh`)
-> before sharing. A result without its `run_meta.json` is not a result.
-
----
-
-## The finding in one sentence
-
-> Past the knee of the concurrency sweep, system throughput gains **~5%** while **p99**
-> inter-token latency degrades **4.4×** (110 ms → 480 ms). The mean hides it; the distribution doesn't.
-
-That sentence — and the methodology that earns it — is the whole project.
-
 ## What this is (and isn't)
 
 This **is** a measurement instrument: it runs a real serving stack, sweeps the knobs that
@@ -36,6 +23,10 @@ Three questions it answers:
 2. What's the real throughput/latency tradeoff, and where's the honest operating point?
 3. How badly does the tail degrade under load, and *why*?
 
+The whole point, in one line: **past the knee of the concurrency sweep, throughput stops
+improving while p99 inter-token latency keeps climbing. The mean hides that regression; the
+distribution doesn't.** This harness is built to make that visible and defensible.
+
 ---
 
 ## 1 · Prefill vs. decode: two different machines
@@ -45,16 +36,14 @@ at once and **saturates the GPU** (compute-bound, high arithmetic intensity). De
 token at a time and **leaves the GPU mostly idle**, gated by memory bandwidth. Optimizing
 inference is mostly optimizing decode.
 
-| Phase   | Metric              | Value*  | SM utilization* | Roofline regime              |
-|---------|---------------------|---------|-----------------|------------------------------|
-| Prefill | TTFT (512-tok prompt) | 62 ms   | 94%             | compute-bound                |
-| Decode  | ITL (per token)     | 21 ms   | 34%             | memory-bandwidth-bound       |
+| Phase   | Captured as            | Roofline regime          |
+|---------|------------------------|--------------------------|
+| Prefill | TTFT (time to first token) | compute-bound        |
+| Decode  | ITL (per-token latency)    | memory-bandwidth-bound |
 
-<sub>*illustrative placeholders — replace with measured values.</sub>
-
-The low decode utilization is the measured evidence for the memory-bound claim, not an assertion.
-
-![Prefill vs decode decomposition](results/figures/prefill_decode.png)
+The harness keeps these two strictly separate — they are never merged into one "latency" —
+and records GPU utilization alongside, so the memory-bound claim for decode is *measured*, not
+asserted.
 
 ---
 
@@ -62,30 +51,16 @@ The low decode utilization is the measured evidence for the memory-bound claim, 
 
 Sweeping concurrency traces the frontier every deployment negotiates. Throughput saturates
 long before latency does — so the **knee** is the honest operating point. Everything to the
-right buys throughput with tail latency.
-
-| Concurrency | Throughput (tok/s)* | p50 ITL (ms)* | p99 ITL (ms)* |
-|------------:|--------------------:|--------------:|--------------:|
-| 1           | 48                  | 21            | 24            |
-| 4           | 175                 | 24            | 35            |
-| 8           | 320                 | 28            | 55            |
-| **16 (knee)** | **520**           | **38**        | **110**       |
-| 32          | 610                 | 62            | 240           |
-| 48          | 638                 | 95            | 480           |
-
-<sub>*illustrative placeholders.</sub>
-
-![Throughput vs p99 Pareto frontier](results/figures/pareto.png)
+right buys throughput with tail latency. The harness detects the knee automatically and reports
+it as the recommended operating concurrency.
 
 ---
 
 ## 3 · Where the mean lies: p50 vs. p99 under load
 
 The signature result. As concurrency rises, the **median barely moves** — so an averaged
-benchmark reports "fine." Meanwhile **p99 detaches and climbs an order of magnitude**. Reporting
-a single number would have erased a 4.4× tail-latency regression.
-
-![p50 vs p99 under concurrency](results/figures/tail_latency.png)
+benchmark reports "fine." Meanwhile **p99 detaches and climbs**. Reporting a single number
+would erase the tail-latency regression entirely.
 
 ---
 
@@ -94,11 +69,12 @@ a single number would have erased a 4.4× tail-latency regression.
 The credibility *is* the product. This harness refuses to report a single averaged latency.
 
 - **Full distribution, always.** Every latency figure carries p50 / p95 / p99.
-- **Automatic warmup detection.** Warmup is found via a rolling-stability test and discarded —
-  never eyeballed, never a hardcoded "drop first N."
+- **Automatic warmup detection.** Warmup is found via the MSER-5 rule (a marginal-standard-error
+  changepoint) and discarded — never eyeballed, never a hardcoded "drop first N."
 - **Latency is correlated, not i.i.d.** Consecutive request latencies are coupled through
   KV-cache occupancy and scheduler state. The harness measures the **autocorrelation** between
-  successive requests and explains it, rather than pretending samples are independent.
+  successive requests and reports the integrated autocorrelation time, rather than pretending
+  samples are independent.
 - **Convergence window.** An Allan-variance-style check reports the number of requests at which
   measured throughput actually stabilizes — so the run length is justified, not arbitrary.
 - **Utilization recorded alongside latency**, so the roofline claims are measured.
@@ -108,21 +84,31 @@ estimation / Allan-variance analysis), applied here to inference serving.
 
 ---
 
+## Results
+
+No measured run is committed yet. On a GPU, `./reproduce.sh` produces the derived sweep table
+(throughput, p50/p95/p99 TTFT and ITL, the knee) and three figures —
+`prefill_decode.png`, `pareto.png`, `tail_latency.png` — written to `results/` alongside a
+`run_meta.json` that captures the exact model, dtype, vLLM version, GPU, and driver. Aggregates
+and figures are *derived* from the raw per-request data, never hand-edited. See
+[docs/cloud-run.md](docs/cloud-run.md) for a one-evening, ~\$2 walkthrough.
+
+---
+
 ## Reproduce
 
 ```bash
-# 1. set your target in AGENTS.md (model, GPU, VRAM), then:
 pip install -e .
 
-# 2. regenerate every committed result and figure
-./reproduce.sh --model llama-3.1-8b --backend vllm --sweep concurrency
+# run the sweep and regenerate every result and figure
+./reproduce.sh --model Qwen/Qwen2.5-7B-Instruct --sweep concurrency
 ```
 
-Each run writes per-request data to `results/raw/` plus a `run_meta.json` capturing model,
-dtype, vLLM version, GPU, driver, and workload. Aggregates and figures are *derived* from raw
-data, never hand-edited.
+Each run writes per-request data to `results/raw/` plus a `run_meta.json`. A result without
+its `run_meta.json` is not a result.
 
 > Requires an NVIDIA GPU. On a Mac / no GPU, rent a cloud instance — only the backend changes.
+> See [docs/cloud-run.md](docs/cloud-run.md).
 
 ---
 
@@ -130,10 +116,9 @@ data, never hand-edited.
 
 ```
 decodebound/
-├── AGENTS.md            instructions for coding agents
 ├── harness/             server launch · workloads · concurrency sweep
 ├── analysis/            stats (percentiles, ACF, warmup, convergence) · decompose · plots
-├── results/             raw per-request data + figures (committed)
+├── results/             raw per-request data + figures (populated by a real run)
 └── report.md            longer write-up
 ```
 
