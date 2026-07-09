@@ -43,6 +43,18 @@ def test_abort_if_server_dead():
     sweep._abort_if_server_dead(mixed, label="c4")  # no raise
 
 
+def test_run_meta_records_serving_provenance(monkeypatch):
+    from harness import sweep, workload
+
+    monkeypatch.setenv("VLLM_ATTENTION_BACKEND", "XFORMERS")
+    cfg = server.ServerConfig(model="m", extra_args=("--enforce-eager",))
+    gpu = server.GpuInfo("Tesla T4", 15360, "580", None)
+    meta = sweep._run_meta(cfg, workload.DEFAULT, gpu, (1, 2), vllm_version="0.24.0")
+    assert meta["enforce_eager"] is True
+    assert meta["attention_backend"] == "XFORMERS"
+    assert meta["vllm_extra_args"] == ["--enforce-eager"]
+
+
 def test_wait_until_healthy_fails_fast_on_dead_proc():
     # A server process that dies at startup must raise immediately with its exit
     # code, not poll a corpse until the timeout.

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -311,6 +312,12 @@ def _run_meta(cfg: server.ServerConfig, wl: workload.Workload, gpu: server.GpuIn
         "concurrencies": list(concurrencies),
         "max_model_len": cfg.max_model_len,
         "gpu_memory_utilization": cfg.gpu_memory_utilization,
+        # Serving-path provenance: these change the numbers, so record them. On the
+        # T4 (compute cap < 8) the run forces eager mode + xformers because
+        # FlashAttention 2 is unavailable — a result carries the config it was taken under.
+        "enforce_eager": "--enforce-eager" in cfg.extra_args,
+        "vllm_extra_args": list(cfg.extra_args),
+        "attention_backend": os.environ.get("VLLM_ATTENTION_BACKEND"),
     }
 
 
