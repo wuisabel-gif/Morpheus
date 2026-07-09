@@ -1,0 +1,65 @@
+{
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "dtype": "half",
+  "seed": 0,
+  "vllm_version": "0.24.0",
+  "gpu": {
+    "name": "Tesla T4",
+    "memory_total_mib": 15360,
+    "driver_version": "580.159.04",
+    "cuda_version": null
+  },
+  "workload": {
+    "name": "512in-256out",
+    "prompt_len": 512,
+    "output_len": 256,
+    "n_requests": 128,
+    "temperature": 0.0,
+    "seed": 0
+  },
+  "concurrencies": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "max_model_len": 4096,
+  "gpu_memory_utilization": 0.9,
+  "mode": "closed-loop",
+  "raw_files": [
+    "raw_c1.parquet",
+    "raw_c2.parquet",
+    "raw_c4.parquet",
+    "raw_c8.parquet",
+    "raw_c16.parquet"
+  ],
+  "gpu_util_file": "gpu_util.parquet",
+  "gpu_util_summary": {
+    "c1": {
+      "n_samples": 4340,
+      "util_gpu_pct_mean": 49.73663594470046,
+      "util_mem_pct_mean": 44.88179723502304
+    },
+    "c2": {
+      "n_samples": 1776,
+      "util_gpu_pct_mean": 49.93074324324324,
+      "util_mem_pct_mean": 47.71621621621622
+    },
+    "c4": {
+      "n_samples": 944,
+      "util_gpu_pct_mean": 49.96186440677966,
+      "util_mem_pct_mean": 45.932203389830505
+    },
+    "c8": {
+      "n_samples": 538,
+      "util_gpu_pct_mean": 49.89776951672862,
+      "util_mem_pct_mean": 42.22304832713755
+    },
+    "c16": {
+      "n_samples": 330,
+      "util_gpu_pct_mean": 49.82424242424243,
+      "util_mem_pct_mean": 37.412121212121214
+    }
+  }
+}

@@ -163,12 +163,34 @@ tools' output can be checked against.
 
 ## Results
 
-No measured run is committed yet. On a GPU, `./reproduce.sh` produces the derived sweep table
-(throughput, p50/p95/p99 TTFT and ITL, the knee) and three figures —
-`prefill_decode.png`, `pareto.png`, `tail_latency.png` — written to `results/` alongside a
-`run_meta.json` that captures the exact model, dtype, vLLM version, GPU, and driver. Aggregates
-and figures are *derived* from the raw per-request data, never hand-edited. See
-[docs/cloud-run.md](docs/cloud-run.md) for a one-evening, ~\$2 walkthrough.
+First committed run: **Qwen2.5-1.5B-Instruct, fp16, vLLM 0.24.0, 1× Tesla T4** (a free Kaggle
+GPU), 128 requests × 5 concurrency points, 512 in / 256 out. Full provenance in
+[results/raw/run_meta.json](results/raw/run_meta.json); figures in `results/figures/`.
+
+| conc | tok/s | ITL p50 | ITL p99 | TTFT p50 | TTFT p99 |
+|---:|---:|---:|---:|---:|---:|
+| 1  | 48  | 20.4 | 22.1 | 110 | 115 |
+| 2  | 120 | 16.6 | 17.3 | 52  | 62  |
+| 4  | 224 | 17.6 | 18.6 | 49  | 55  |
+| 8  | 398 | 19.9 | 21.6 | 70  | 85  |
+| 16 | 648 | 24.3 | 28.2 | 88  | 129 |
+
+Knee: **concurrency 8**. Utilization was sampled throughout (~50% SM-busy, 37–48%
+memory-controller-busy — a 1.5B model doesn't saturate even a T4; the decode-bound story needs
+the 7B+ run).
+
+**And `certify` flagged its own run** — which is the point:
+
+- Every **ITL** series at c2–c16 (≈32k token events each): **TRUSTED**. Measured
+  τ_int = 13–30, so 32k events collapse to an effective sample size of ~1,100–2,500 —
+  the "requests are correlated" claim is now a measurement, not an argument.
+- Every **TTFT p99**: **UNDERPOWERED**. 128 requests per point leaves ~1 effective tail
+  sample; certify says ~2,000 are needed. The TTFT p99 column above is printed *and*
+  flagged as not yet trustworthy.
+
+A benchmark that publishes its numbers alongside the verdict that some of them don't deserve
+trust yet — that's the methodology working as designed. Reproduce with `./reproduce.sh`; see
+[docs/cloud-run.md](docs/cloud-run.md) for the zero-to-result walkthrough.
 
 ---
 
