@@ -95,6 +95,31 @@ estimation / Allan-variance analysis), applied here to inference serving.
 
 ---
 
+## How it compares
+
+Mature harnesses already exist, and they beat DecodeBound on **breadth** — backends, datasets,
+traffic models, cluster orchestration. [guidellm](https://github.com/vllm-project/guidellm) and
+NVIDIA [aiperf](https://github.com/ai-dynamo/aiperf) are the reference tools to reach for if you
+need many backends or SLO-driven sweeps out of the box. DecodeBound doesn't compete on that
+axis. It leans into a narrower one: **treating each sweep point as a stochastic process and
+reporting whether the measurement itself is trustworthy** — warmup removed by a changepoint rule,
+sample independence checked rather than assumed, run length justified by a convergence criterion.
+
+| Capability | guidellm | aiperf | DecodeBound |
+|---|:---:|:---:|:---:|
+| Full TTFT/ITL/E2E distributions | ✅ | ✅ | ✅ |
+| Open-loop (Poisson) arrivals | ✅ | ✅ | ✅ |
+| Prefill/decode split as a first-class axis | partial | partial | ✅ |
+| Automatic warmup detection (MSER-5) | ❌ | ❌ | ✅ |
+| Autocorrelation / effective sample size | ❌ | ❌ | ✅ |
+| Allan-variance convergence window | ❌ | ❌ | ✅ |
+| Many backends / datasets / cluster scale | ✅ | ✅ | ❌ |
+
+The claim is not "better benchmark." It's "the same numbers, with the statistical hygiene that
+tells you when to believe them" — and that stats layer is what these tools don't have.
+
+---
+
 ## Results
 
 No measured run is committed yet. On a GPU, `./reproduce.sh` produces the derived sweep table
