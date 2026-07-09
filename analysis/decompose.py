@@ -8,7 +8,7 @@ phases are kept apart: TTFT is prefill (compute-bound), the ITL stream is decode
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -17,12 +17,16 @@ import pandas as pd
 from analysis import stats
 
 
-def load_raw(raw_dir: Path | str) -> pd.DataFrame:
-    """Load and concatenate all ``raw_c*.parquet`` files, parsing the ITL lists."""
+def load_raw(raw_dir: Path | str, pattern: str = "raw_c*.parquet") -> pd.DataFrame:
+    """Load and concatenate raw parquet files matching ``pattern``, parsing ITL lists.
+
+    Closed-loop points are ``raw_c*.parquet``; open-loop (Poisson) points are
+    ``raw_r*.parquet`` — pass ``pattern="raw_r*.parquet"`` for those.
+    """
     raw_dir = Path(raw_dir)
-    files = sorted(raw_dir.glob("raw_c*.parquet"))
+    files = sorted(raw_dir.glob(pattern))
     if not files:
-        raise FileNotFoundError(f"no raw_c*.parquet under {raw_dir}")
+        raise FileNotFoundError(f"no {pattern} under {raw_dir}")
     df = pd.concat((pd.read_parquet(f) for f in files), ignore_index=True)
     df["itl_ms"] = df["itl_ms"].apply(lambda s: json.loads(s) if isinstance(s, str) else list(s))
     return df
@@ -40,59 +44,67 @@ def _ordered_steady(group: pd.DataFrame) -> pd.DataFrame:
     return g
 
 
-@dataclass(frozen=True)
-class SweepPoint:
-    concurrency: int
-    n_requests: int
-    throughput_tok_s: float
-    ttft_p50: float
-    ttft_p99: float
-    itl_p50: float
-    itl_p95: float
-    itl_p99: float
-    itl_lag1_acf: float
-    warmup_discarded: int
+def _group_metrics(group: pd.DataFrame) -> dict[str, object]:
+    """Per-sweep-point metrics (warmup removed) shared by both load modes."""
+    full = group.sort_values("t_start")
+    steady = _ordered_steady(group)
+    discarded = len(full) - len(steady)
+
+    # Throughput over the steady-state wall-clock for this point.
+    ends = steady["t_start"] + steady["e2e_ms"] / 1e3
+    duration = float(ends.max() - steady["t_start"].min()) if len(steady) else float("nan")
+    total_out = float(steady["output_tokens"].sum())
+    throughput = total_out / duration if duration and duration > 0 else float("nan")
+
+    # Errored requests get nan TTFT in the raw rows; their share is itself a
+    # saturation signal, so it is reported rather than silently dropped.
+    n_errors = int(steady["error"].notna().sum()) if "error" in steady else 0
+
+    ttft = steady["ttft_ms"].to_numpy()
+    ttft = ttft[np.isfinite(ttft)]
+    itl_pool = np.array([v for lst in steady["itl_ms"] for v in lst], dtype=float)
+
+    ttft_sum = stats.percentile_summary(ttft) if ttft.size else None
+    itl_sum = stats.percentile_summary(itl_pool) if itl_pool.size else None
+    lag1 = stats.autocorrelation(itl_pool).lag1 if itl_pool.size > 2 else float("nan")
+
+    return {
+        "n_requests": int(len(steady)),
+        "error_rate": n_errors / len(steady) if len(steady) else float("nan"),
+        "throughput_tok_s": throughput,
+        "ttft_p50": ttft_sum.p50 if ttft_sum else float("nan"),
+        "ttft_p99": ttft_sum.p99 if ttft_sum else float("nan"),
+        "itl_p50": itl_sum.p50 if itl_sum else float("nan"),
+        "itl_p95": itl_sum.p95 if itl_sum else float("nan"),
+        "itl_p99": itl_sum.p99 if itl_sum else float("nan"),
+        "itl_lag1_acf": lag1,
+        "warmup_discarded": discarded,
+    }
 
 
 def aggregate_sweep(df: pd.DataFrame) -> pd.DataFrame:
     """One row per concurrency: throughput + TTFT/ITL distributions (warmup removed)."""
-    rows: list[dict[str, object]] = []
-    for c, group in df.groupby("concurrency"):
-        full = group.sort_values("t_start")
-        steady = _ordered_steady(group)
-        discarded = len(full) - len(steady)
-
-        # Throughput over the steady-state wall-clock for this point.
-        ends = steady["t_start"] + steady["e2e_ms"] / 1e3
-        duration = float(ends.max() - steady["t_start"].min()) if len(steady) else float("nan")
-        total_out = float(steady["output_tokens"].sum())
-        throughput = total_out / duration if duration and duration > 0 else float("nan")
-
-        ttft = steady["ttft_ms"].to_numpy()
-        ttft = ttft[np.isfinite(ttft)]
-        itl_pool = np.array([v for lst in steady["itl_ms"] for v in lst], dtype=float)
-
-        ttft_sum = stats.percentile_summary(ttft) if ttft.size else None
-        itl_sum = stats.percentile_summary(itl_pool) if itl_pool.size else None
-        lag1 = stats.autocorrelation(itl_pool).lag1 if itl_pool.size > 2 else float("nan")
-
-        rows.append(
-            asdict(
-                SweepPoint(
-                    concurrency=int(c),
-                    n_requests=int(len(steady)),
-                    throughput_tok_s=throughput,
-                    ttft_p50=ttft_sum.p50 if ttft_sum else float("nan"),
-                    ttft_p99=ttft_sum.p99 if ttft_sum else float("nan"),
-                    itl_p50=itl_sum.p50 if itl_sum else float("nan"),
-                    itl_p95=itl_sum.p95 if itl_sum else float("nan"),
-                    itl_p99=itl_sum.p99 if itl_sum else float("nan"),
-                    itl_lag1_acf=lag1,
-                    warmup_discarded=discarded,
-                )
-            )
-        )
+    rows = [
+        {"concurrency": int(c), **_group_metrics(group)}
+        for c, group in df.groupby("concurrency")
+    ]
     return pd.DataFrame(rows).sort_values("concurrency").reset_index(drop=True)
+
+
+def aggregate_rate_sweep(df: pd.DataFrame) -> pd.DataFrame:
+    """Open-loop counterpart of :func:`aggregate_sweep`: one row per Poisson rate.
+
+    Groups by ``arrival_rate_rps`` (rows written by ``run_open_loop_sweep``). The
+    same warmup removal and distribution summaries apply; only the independent
+    variable changes from pinned concurrency to offered load.
+    """
+    if "arrival_rate_rps" not in df.columns:
+        raise ValueError("no arrival_rate_rps column — is this open-loop data (raw_r*)?")
+    rows = [
+        {"arrival_rate_rps": float(r), **_group_metrics(group)}
+        for r, group in df.groupby("arrival_rate_rps")
+    ]
+    return pd.DataFrame(rows).sort_values("arrival_rate_rps").reset_index(drop=True)
 
 
 @dataclass(frozen=True)
@@ -130,19 +142,19 @@ def prefill_decode_split(df: pd.DataFrame, concurrency: int = 1) -> PrefillDecod
     )
 
 
-def find_knee(agg: pd.DataFrame) -> int:
-    """Knee of the throughput-vs-concurrency curve (Kneedle, concave-increasing).
+def find_knee(agg: pd.DataFrame, x_col: str = "concurrency") -> float:
+    """Knee of the throughput curve (Kneedle, concave-increasing).
 
     Normalize both axes to [0,1]; for a diminishing-returns curve the knee is the
     point furthest above the chord from first to last (max of y_norm - x_norm). That
-    concurrency is the honest operating point — past it, throughput stalls while tail
-    latency climbs.
+    x (concurrency, or arrival rate for open-loop data) is the honest operating
+    point — past it, throughput stalls while tail latency climbs.
     """
-    a = agg.sort_values("concurrency")
-    x = a["concurrency"].to_numpy(dtype=float)
+    a = agg.sort_values(x_col)
+    x = a[x_col].to_numpy(dtype=float)
     y = a["throughput_tok_s"].to_numpy(dtype=float)
     if len(x) < 3:
-        return int(x[-1])
+        return float(x[-1])
     xn = (x - x.min()) / (np.ptp(x) or 1.0)
     yn = (y - y.min()) / (np.ptp(y) or 1.0)
-    return int(x[int(np.argmax(yn - xn))])
+    return float(x[int(np.argmax(yn - xn))])

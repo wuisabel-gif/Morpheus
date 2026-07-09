@@ -77,7 +77,18 @@ The credibility *is* the product. This harness refuses to report a single averag
   samples are independent.
 - **Convergence window.** An Allan-variance-style check reports the number of requests at which
   measured throughput actually stabilizes — so the run length is justified, not arbitrary.
-- **Utilization recorded alongside latency**, so the roofline claims are measured.
+- **Utilization recorded alongside latency.** A background sampler polls `nvidia-smi`
+  (~4 Hz) throughout the sweep — SM-busy % (compute pressure) and memory-controller-busy %
+  (the bandwidth-bound signal for decode) — timestamped on the same clock as every
+  request, written to `results/raw/gpu_util.parquet`, and summarized per sweep point in
+  `run_meta.json`. The roofline claims are measured, not asserted.
+- **Coordinated omission, addressed.** A closed-loop worker pool slows its arrivals
+  whenever the server slows down, silently absorbing queueing delay and understating the
+  tail. `decodebound sweep --arrival-rate 0.5,1,2,4` runs an **open-loop Poisson sweep**
+  instead: arrival times are pre-drawn (seeded, reproducible) and never conditioned on
+  completions, so queueing delay lands in TTFT/ITL where it belongs. Closed loop answers
+  "throughput at a pinned batch size"; open loop is the mode to trust for tail-latency
+  claims. Analyze with `decodebound analyze --mode open`.
 
 This methodology comes from a background in stochastic-process characterization (state
 estimation / Allan-variance analysis), applied here to inference serving.

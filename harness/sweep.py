@@ -8,6 +8,14 @@ worker pool, and writes one row per request to ``results/raw/`` plus a
 
 The timing math lives in :func:`compute_timing`, a pure function tested without a
 network so the metric definitions are pinned down independently of the transport.
+
+Two load modes:
+
+* **Closed loop** (:func:`run_sweep`) — a worker pool holds a fixed concurrency.
+* **Open loop** (:func:`run_open_loop_sweep`) — requests launch at pre-drawn Poisson
+  arrival times regardless of completions. The closed loop slows its arrivals whenever
+  the server slows down (*coordinated omission*), which understates tail latency;
+  the open loop lets queueing delay land in the measurement instead.
 """
 
 from __future__ import annotations
@@ -19,8 +27,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import httpx
+import numpy as np
 
-from harness import server, workload
+from harness import gpumon, server, workload
 
 
 # --------------------------------------------------------------------------- #
@@ -71,6 +80,7 @@ class RequestRecord:
     e2e_ms: float = float("nan")
     t_start: float = 0.0
     error: str | None = None
+    arrival_rate_rps: float | None = None  # set only in open-loop mode
 
     def row(self) -> dict[str, object]:
         d = asdict(self)
@@ -194,6 +204,67 @@ async def _run_at_concurrency(
 
 
 # --------------------------------------------------------------------------- #
+# Open-loop (Poisson) load — the coordinated-omission-free mode.
+# --------------------------------------------------------------------------- #
+def poisson_offsets(n: int, rate_rps: float, seed: int = 0) -> list[float]:
+    """Cumulative arrival offsets (seconds from t0) of a Poisson process at ``rate_rps``.
+
+    Inter-arrival gaps are exponential with mean ``1/rate_rps``, drawn *ahead of
+    time* and never conditioned on completions — the definition of an open loop.
+    Seeded per (seed, rate) so a rerun replays the identical arrival schedule.
+    Pure function; this is the tested surface of the open-loop mode.
+    """
+    if n < 1:
+        raise ValueError("poisson_offsets needs n >= 1")
+    if rate_rps <= 0:
+        raise ValueError("rate_rps must be positive")
+    rng = np.random.default_rng([seed, int(round(rate_rps * 1e6))])
+    return np.cumsum(rng.exponential(1.0 / rate_rps, size=n)).tolist()
+
+
+async def _run_at_rate(
+    base_url: str,
+    model: str,
+    prompts: list[str],
+    rate_rps: float,
+    max_tokens: int,
+    temperature: float,
+    prompt_len_target: int,
+    seed: int,
+) -> list[RequestRecord]:
+    """Issue ``len(prompts)`` requests at pre-drawn Poisson arrival times.
+
+    Unlike :func:`_run_at_concurrency`, nothing here waits for a response before
+    launching the next request: a slow server accumulates in-flight requests and the
+    resulting queueing delay shows up in TTFT/ITL, where it belongs. This is the mode
+    to trust for tail-latency claims; the closed loop is the mode to trust for
+    "throughput at a pinned batch size".
+    """
+    offsets = poisson_offsets(len(prompts), rate_rps, seed)
+    async with httpx.AsyncClient() as client:
+        t0 = time.perf_counter()
+        tasks: list[asyncio.Task[RequestRecord]] = []
+        for (i, prompt), offset in zip(enumerate(prompts), offsets, strict=True):
+            delay = (t0 + offset) - time.perf_counter()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            # concurrency=0 marks open-loop rows; in-flight count is emergent here.
+            tasks.append(
+                asyncio.create_task(
+                    _stream_one(
+                        client, base_url, model, prompt, max_tokens, temperature,
+                        i, 0, prompt_len_target,
+                    )
+                )
+            )
+        records = list(await asyncio.gather(*tasks))
+    for rec in records:
+        rec.arrival_rate_rps = rate_rps
+    records.sort(key=lambda r: r.t_start)
+    return records
+
+
+# --------------------------------------------------------------------------- #
 # Top-level sweep + persistence.
 # --------------------------------------------------------------------------- #
 DEFAULT_CONCURRENCIES = (1, 2, 4, 8, 16, 32, 48)
@@ -248,10 +319,12 @@ def run_sweep(
 
     prompts = workload.make_prompts(wl)
     written: list[Path] = []
+    sampler = gpumon.GpuSampler()
 
-    with server.serve(cfg, launch=launch_server):
+    with server.serve(cfg, launch=launch_server), sampler:
         served = server.fetch_served_model(cfg.base_url) or cfg.model
         for c in concurrencies:
+            sampler.set_label(f"c{c}")
             records = asyncio.run(
                 _run_at_concurrency(
                     cfg.base_url, served, prompts, c, wl.output_len, wl.temperature, wl.prompt_len,
@@ -259,8 +332,63 @@ def run_sweep(
             )
             written.append(_write_raw(records, out_dir, tag=f"c{c}"))
 
+    util_path = sampler.to_parquet(out_dir / "gpu_util.parquet")
     meta = _run_meta(cfg, wl, gpu, concurrencies, vllm_version)
+    meta["mode"] = "closed-loop"
     meta["raw_files"] = [p.name for p in written]
+    meta["gpu_util_file"] = util_path.name if util_path else None
+    meta["gpu_util_summary"] = sampler.summary()
+    meta_path = out_dir / "run_meta.json"
+    meta_path.write_text(json.dumps(meta, indent=2))
+    return meta_path
+
+
+def run_open_loop_sweep(
+    cfg: server.ServerConfig,
+    wl: workload.Workload = workload.DEFAULT,
+    rates_rps: tuple[float, ...] = (0.5, 1.0, 2.0, 4.0, 8.0),
+    out_dir: Path | str = "results/raw",
+    *,
+    launch_server: bool = True,
+) -> Path:
+    """Open-loop counterpart of :func:`run_sweep`: sweep Poisson arrival rates.
+
+    Writes one ``raw_r<rate>.parquet`` per rate plus the same provenance
+    ``run_meta.json`` (with ``mode: open-loop``). Rows carry ``arrival_rate_rps``;
+    the ``concurrency`` column is 0 because in-flight count is emergent, not pinned.
+    """
+    out_dir = Path(out_dir)
+    gpu = server.require_gpu()
+    try:
+        import vllm  # type: ignore
+
+        vllm_version = getattr(vllm, "__version__", None)
+    except ImportError:
+        vllm_version = None
+
+    prompts = workload.make_prompts(wl)
+    written: list[Path] = []
+    sampler = gpumon.GpuSampler()
+
+    with server.serve(cfg, launch=launch_server), sampler:
+        served = server.fetch_served_model(cfg.base_url) or cfg.model
+        for rate in rates_rps:
+            sampler.set_label(f"r{rate:g}")
+            records = asyncio.run(
+                _run_at_rate(
+                    cfg.base_url, served, prompts, rate,
+                    wl.output_len, wl.temperature, wl.prompt_len, cfg.seed,
+                )
+            )
+            written.append(_write_raw(records, out_dir, tag=f"r{rate:g}"))
+
+    util_path = sampler.to_parquet(out_dir / "gpu_util.parquet")
+    meta = _run_meta(cfg, wl, gpu, concurrencies=(), vllm_version=vllm_version)
+    meta["mode"] = "open-loop"
+    meta["arrival_rates_rps"] = list(rates_rps)
+    meta["raw_files"] = [p.name for p in written]
+    meta["gpu_util_file"] = util_path.name if util_path else None
+    meta["gpu_util_summary"] = sampler.summary()
     meta_path = out_dir / "run_meta.json"
     meta_path.write_text(json.dumps(meta, indent=2))
     return meta_path

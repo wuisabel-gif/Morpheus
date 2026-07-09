@@ -52,11 +52,17 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         n_requests=args.n_requests,
         seed=args.seed,
     )
-    concurrencies = _parse_concurrency(args.concurrency)
+    open_loop = bool(args.arrival_rate)
+    if open_loop:
+        rates = tuple(float(x) for x in args.arrival_rate.split(",") if x.strip())
+        points, kind = rates, "arrival-rate (open-loop Poisson)"
+    else:
+        concurrencies = _parse_concurrency(args.concurrency)
+        points, kind = concurrencies, "concurrency (closed-loop)"
 
-    n_points = len(concurrencies)
+    n_points = len(points)
     total_requests = n_points * wl.n_requests
-    print(f"Planned: {n_points} concurrency points x {wl.n_requests} requests "
+    print(f"Planned: {n_points} {kind} points x {wl.n_requests} requests "
           f"= {total_requests} requests against {args.model}.")
     if not args.yes:
         reply = input("Proceed? [y/N] ").strip().lower()
@@ -64,9 +70,14 @@ def cmd_sweep(args: argparse.Namespace) -> int:
             print("Aborted.")
             return 1
 
-    meta = sweep.run_sweep(
-        cfg, wl, concurrencies, out_dir=args.raw, launch_server=not args.no_launch
-    )
+    if open_loop:
+        meta = sweep.run_open_loop_sweep(
+            cfg, wl, rates, out_dir=args.raw, launch_server=not args.no_launch
+        )
+    else:
+        meta = sweep.run_sweep(
+            cfg, wl, concurrencies, out_dir=args.raw, launch_server=not args.no_launch
+        )
     print(f"Wrote {meta}")
     return 0
 
@@ -74,14 +85,20 @@ def cmd_sweep(args: argparse.Namespace) -> int:
 def cmd_analyze(args: argparse.Namespace) -> int:
     from analysis import decompose
 
-    df = decompose.load_raw(args.raw)
-    agg = decompose.aggregate_sweep(df)
-    knee = decompose.find_knee(agg)
-    cols = ["concurrency", "n_requests", "throughput_tok_s",
+    if args.mode == "open":
+        df = decompose.load_raw(args.raw, pattern="raw_r*.parquet")
+        agg = decompose.aggregate_rate_sweep(df)
+        x_col, x_name = "arrival_rate_rps", "arrival rate (req/s)"
+    else:
+        df = decompose.load_raw(args.raw)
+        agg = decompose.aggregate_sweep(df)
+        x_col, x_name = "concurrency", "concurrency"
+    knee = decompose.find_knee(agg, x_col=x_col)
+    cols = [x_col, "n_requests", "error_rate", "throughput_tok_s",
             "itl_p50", "itl_p99", "ttft_p50", "ttft_p99", "itl_lag1_acf"]
     with __import__("pandas").option_context("display.float_format", lambda v: f"{v:.2f}"):
         print(agg[cols].to_string(index=False))
-    print(f"\nKnee (honest operating point): concurrency = {knee}")
+    print(f"\nKnee (honest operating point): {x_name} = {knee:g}")
     return 0
 
 
@@ -112,6 +129,9 @@ def build_parser() -> argparse.ArgumentParser:
     sw.add_argument("--seed", type=int, default=0)
     sw.add_argument("--port", type=int, default=8000)
     sw.add_argument("--raw", default="results/raw")
+    sw.add_argument("--arrival-rate", default="", dest="arrival_rate",
+                    help="comma-separated req/s (e.g. '0.5,1,2,4'): run an open-loop "
+                         "Poisson sweep instead of the closed-loop concurrency sweep")
     sw.add_argument("--no-launch", action="store_true",
                     help="assume a server is already running (don't spawn vLLM)")
     sw.add_argument("--yes", "-y", action="store_true", help="skip the run-plan confirmation")
@@ -119,6 +139,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     an = sub.add_parser("analyze", help="print derived sweep table")
     an.add_argument("--raw", default="results/raw")
+    an.add_argument("--mode", choices=("closed", "open"), default="closed",
+                    help="closed = concurrency sweep (raw_c*); open = Poisson rate sweep (raw_r*)")
     an.set_defaults(func=cmd_analyze)
 
     pl = sub.add_parser("plot", help="regenerate figures")

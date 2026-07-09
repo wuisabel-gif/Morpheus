@@ -1,0 +1,34 @@
+# CI for the GPU-free layer: everything in analysis/ and the pure functions in
+# harness/ run anywhere, so lint + tests are cheap signal on every push. The
+# serving path (vLLM, CUDA) is deliberately NOT exercised here — see AGENTS.md:
+# no CPU fallback, no fabricated numbers.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install (analysis layer + dev tools, no vLLM)
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: pytest --cov=harness --cov=analysis --cov-report=term-missing
