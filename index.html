@@ -129,6 +129,17 @@
   .finding p{margin:0; font-size:18px; line-height:1.45}
   .finding .num{font-family:var(--mono); color:var(--teal); font-weight:600}
 
+  /* certify verdict card */
+  .card{
+    background:#0e0d0b; border:1px solid var(--line); border-radius:3px;
+    padding:16px 18px; font-family:var(--mono); font-size:12.5px; line-height:1.75;
+    color:#cfcabb; overflow-x:auto; white-space:pre;
+  }
+  .card .ok{color:var(--teal)}
+  .card .low{color:var(--amber)}
+  .card .bad{color:var(--coral)}
+  .card .dim{color:var(--mut-2)}
+
   /* footer */
   footer{border-top:1px solid var(--line); margin-top:54px; padding:26px 0 60px; font-family:var(--mono); font-size:12.5px; color:var(--mut)}
   .repro{background:#0e0d0b; border:1px solid var(--line); border-radius:3px; padding:13px 16px; color:#cfcabb; margin:0 0 16px; overflow-x:auto}
@@ -176,7 +187,9 @@
       A reproducible harness that decomposes inference into compute&#8209;bound <em>prefill</em>
       and memory&#8209;bound <em>decode</em>, then treats per&#8209;request latency as a stochastic
       process across batching and concurrency regimes &mdash; mapping the throughput / latency
-      Pareto frontier and the point where p99 detaches from the mean.
+      Pareto frontier and the point where p99 detaches from the mean. And it doesn&rsquo;t just
+      report the numbers: <code style="font-family:var(--mono); font-size:14px; color:var(--teal)">certify</code>
+      issues a verdict on whether they deserve to be believed.
     </p>
     <div class="cfg">
       <div><span>Backend</span><strong>vLLM &middot; continuous batching</strong></div>
@@ -358,13 +371,56 @@
           reported with p50 / p95 / p99 plus a stability flag &mdash; so the numbers are honest
           under load, not just on a quiet GPU.
         </p>
+        <p>
+          <code>Coordinated omission</code>, addressed: a closed&#8209;loop worker pool slows its
+          arrivals whenever the server slows down, silently understating the tail. The harness
+          also runs an <code>open&#8209;loop Poisson</code> sweep &mdash; arrival times pre&#8209;drawn,
+          seeded, never conditioned on completions &mdash; so queueing delay lands in TTFT/ITL where
+          it belongs. And utilization is <em>measured</em>, not asserted: a background sampler logs
+          SM&#8209;busy and memory&#8209;controller&#8209;busy % on the same clock as every request.
+        </p>
       </div>
     </div>
   </section>
 
+  <!-- SECTION 5 : certify -->
+  <section class="sec">
+    <div class="sec-h"><span class="idx">05</span><h2>Certify: should you believe your benchmark?</h2></div>
+    <p class="sec-sub">
+      Every harness will print &ldquo;p99 = 212&nbsp;ms.&rdquo; None will tell you whether that number is a
+      statistic or an anecdote. <code style="font-family:var(--mono); color:var(--teal)">decodebound certify</code>
+      turns the stats layer into verdicts &mdash; and it referees <em>any</em> harness&rsquo;s raw
+      latencies, not just its own.
+    </p>
+    <div class="panel">
+      <p class="panel-h"><span>$ decodebound certify --raw results/raw</span><span class="rd">verdict</span></p>
+      <div class="card">&#9472;&#9472; ITL  @ concurrency=8 &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+n=32640 &rarr; warmup 160 dropped &rarr; steady 32480
+tau_int=4.2 &rarr; effective sample size 7733    <span class="dim">(not 32480 &mdash; requests are correlated)</span>
+mean 24.3 ms &plusmn;1.1% (95% CI)                 <span class="ok">OK</span>
+p99 61.0 ms, tail support 77.3 eff. samples  <span class="ok">OK</span>
+drift: halves differ 1.2% (z=0.9)            <span class="ok">OK</span>
+<span class="ok">VERDICT: TRUSTED</span>
+
+&#9472;&#9472; TTFT @ concurrency=32 &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+n=256 &rarr; warmup 25 dropped &rarr; steady 231
+tau_int=6.8 &rarr; effective sample size 34
+p99 890 ms, tail support 0.3 eff. samples    <span class="low">LOW  (need ~6800 steady requests)</span>
+<span class="low">VERDICT: UNDERPOWERED</span> <span class="dim">&mdash; that p99 is a dice roll, not a percentile</span></div>
+      <figcaption style="font-size:13px; color:var(--mut); margin-top:12px">
+        <b style="color:#cfcabb">Three failure modes it catches</b> &mdash; each leaves the reported number
+        looking perfectly normal: <b style="color:#cfcabb">UNDERPOWERED</b> (autocorrelation shrinks n to an
+        effective n/&tau;; too few effective tail samples), <b style="color:#cfcabb">NONSTATIONARY</b>
+        (run halves disagree beyond their error bars &mdash; thermal throttle, noisy neighbor on a shared GPU),
+        and warmup&#8209;dominated runs. Exits non&#8209;zero unless everything is TRUSTED, so it gates CI.
+        guidellm and aiperf are stopwatches; this is the calibration lab.
+      </figcaption>
+    </div>
+  </section>
+
   <footer>
-    <div class="repro"><span class="p">$</span> ./reproduce.sh --model llama-3.1-8b --sweep concurrency --backend vllm</div>
-    <div>DecodeBound &middot; methodology + harness + committed results &middot; <a href="#">github.com/&lt;you&gt;/decodebound</a></div>
+    <div class="repro"><span class="p">$</span> ./reproduce.sh --model Qwen/Qwen2.5-7B-Instruct --sweep concurrency &amp;&amp; decodebound certify --raw results/raw</div>
+    <div>DecodeBound &middot; methodology + harness + committed results &middot; <a href="https://github.com/wuisabel-gif/decodebound">github.com/wuisabel-gif/decodebound</a></div>
     <div style="color:var(--mut-2); margin-top:8px">mockup &middot; numbers are illustrative placeholders</div>
   </footer>
 
