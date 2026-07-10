@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Morpheus — red pill / blue pill" width="440">
+</p>
+
 # Morpheus
 
 **A reproducible harness for characterizing LLM *serving* performance.**
