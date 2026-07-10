@@ -3,163 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Morpheus — LLM serving characterization</title>
+<title>Morpheus — the benchmark that shows you the tail</title>
 <style>
   :root{
-    --ink:#141310;            /* warm near-black base */
-    --panel:#1c1a16;          /* raised panel */
-    --panel-2:#211f1a;
-    --line:#2e2b24;           /* hairline */
-    --grid:rgba(232,228,216,.05);
-    --fg:#e9e5d8;             /* warm off-white */
-    --mut:#8b8678;            /* muted label */
-    --mut-2:#615d52;
-    --amber:#ffb02e;          /* phosphor signal — the villain trace (p99) */
-    --teal:#54d1c0;           /* steady / throughput */
-    --coral:#ff6b5e;          /* alarm */
+    --void:#04060a;          /* near-black, cool */
+    --panel:#0a0f16;
+    --panel-2:#0d141d;
+    --line:#1a2836;
+    --grid:rgba(120,180,255,.035);
+    --fg:#dce7f2;             /* high-contrast body */
+    --mut:#93a3b4;            /* secondary */
+    --dim:#5a6675;
+    --red:#ff4d5e;           /* red pill · p99 · the tail · the truth */
+    --blue:#4f8cff;          /* blue pill · p50 · the mean · the comfortable story */
+    --green:#3ff08a;         /* phosphor · TRUSTED · system readout */
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --z-nav:10;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
+  html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
   body{
-    margin:0; background:var(--ink); color:var(--fg);
-    font-family:var(--sans); line-height:1.5;
-    -webkit-font-smoothing:antialiased;
+    margin:0; background:var(--void); color:var(--fg);
+    font-family:var(--sans); line-height:1.6; -webkit-font-smoothing:antialiased;
     background-image:
       linear-gradient(var(--grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size:34px 34px;
+    background-size:36px 36px;
+    text-wrap:pretty;
   }
-  .wrap{max-width:980px; margin:0 auto; padding:0 22px}
+  .wrap{max-width:1000px; margin:0 auto; padding:0 22px}
+  a{color:var(--green); text-decoration:none}
+  a:hover{text-decoration:underline}
+  ::selection{background:rgba(79,140,255,.3)}
 
-  /* ---- status bar ---- */
+  /* ---- instrument bar ---- */
   .status{
+    position:relative; z-index:var(--z-nav);
     border-bottom:1px solid var(--line);
     font-family:var(--mono); font-size:12.5px;
-    display:flex; flex-wrap:wrap; align-items:center; gap:18px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:16px;
     padding:13px 0; color:var(--mut);
   }
-  .mark{color:var(--fg); font-weight:700; letter-spacing:.04em}
-  .mark b{color:var(--amber)}
+  .mark{color:var(--fg); font-weight:700; letter-spacing:.02em}
+  .mark b{color:var(--red)}
   .status .sep{flex:1}
-  .pill{border:1px solid var(--line); border-radius:2px; padding:3px 8px; color:var(--teal)}
-  .blink{color:var(--teal)}
+  .pill-tag{border:1px solid var(--line); border-radius:2px; padding:3px 8px; color:var(--green)}
+  .dotred::before{content:"\25CF"; color:var(--red); margin-right:6px}
 
   /* ---- hero ---- */
-  .hero{padding:62px 0 30px}
-  .eyebrow{
-    font-family:var(--mono); font-size:12.5px; letter-spacing:.22em;
-    text-transform:uppercase; color:var(--mut); margin:0 0 22px
+  .hero{position:relative; padding:30px 0 20px; overflow:hidden}
+  #rain{position:absolute; inset:0; width:100%; height:100%; opacity:.10; pointer-events:none; z-index:0}
+  .hero-inner{position:relative; z-index:1}
+  .hero-logo{position:relative; text-align:center; margin:6px 0 14px}
+  .hero-logo img{width:min(560px,88%); position:relative; z-index:1; display:inline-block}
+  .hero-logo::before{
+    content:""; position:absolute; left:50%; top:52%; transform:translate(-50%,-50%);
+    width:min(620px,96%); height:70%; z-index:0; filter:blur(34px);
+    background:
+      radial-gradient(46% 60% at 30% 52%, rgba(255,77,94,.34), transparent 64%),
+      radial-gradient(46% 60% at 70% 52%, rgba(79,140,255,.34), transparent 64%);
   }
+  .eyebrow{font-family:var(--mono); font-size:12.5px; letter-spacing:.14em; color:var(--green); margin:0 0 16px; text-align:center}
   .hero h1{
     font-family:var(--mono); font-weight:700;
-    font-size:clamp(30px,5.4vw,52px); line-height:1.06;
-    letter-spacing:-.01em; margin:0 0 22px; max-width:18ch;
+    font-size:clamp(28px,4.8vw,50px); line-height:1.08; letter-spacing:-.02em;
+    margin:0 auto 20px; max-width:20ch; text-align:center; text-wrap:balance;
   }
-  .hero h1 .a{color:var(--amber)}
-  .hero h1 .t{color:var(--teal)}
-  .lede{font-size:17px; color:#cfcabb; max-width:62ch; margin:0 0 30px}
+  .hero h1 .red{color:var(--red)}
+  .hero h1 .blue{color:var(--blue)}
+  .lede{font-size:17px; color:var(--fg); max-width:64ch; margin:0 auto 26px; text-align:center}
   .cfg{
-    display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--line);
-    border-radius:3px; overflow:hidden; font-family:var(--mono); font-size:12.5px;
+    display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--line); border-radius:4px;
+    overflow:hidden; font-family:var(--mono); font-size:12px; max-width:760px; margin:0 auto;
   }
-  .cfg div{padding:11px 16px; border-right:1px solid var(--line)}
+  .cfg div{padding:10px 15px; border-right:1px solid var(--line); flex:1 1 auto}
   .cfg div:last-child{border-right:0}
-  .cfg span{display:block; color:var(--mut-2); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:3px}
+  .cfg span{display:block; color:var(--dim); font-size:10px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px}
   .cfg strong{font-weight:600; color:var(--fg)}
 
-  /* ---- section heads ---- */
-  .sec{padding:46px 0 8px}
-  .sec-h{display:flex; align-items:baseline; gap:14px; margin-bottom:6px}
-  .idx{font-family:var(--mono); color:var(--amber); font-size:13px}
-  .sec-h h2{font-size:21px; margin:0; font-weight:650; letter-spacing:-.01em}
-  .sec-sub{color:var(--mut); font-size:14.5px; margin:0 0 22px; max-width:64ch}
+  /* ---- the choice : two pills ---- */
+  .choice{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:38px 0 8px}
+  .choose{border:1px solid var(--line); border-radius:6px; padding:22px 22px; background:var(--panel)}
+  .choose.blue{background:linear-gradient(180deg, rgba(79,140,255,.09), rgba(79,140,255,.02))}
+  .choose.red{background:linear-gradient(180deg, rgba(255,77,94,.10), rgba(255,77,94,.02))}
+  .choose h3{font-family:var(--mono); font-size:15px; margin:0 0 8px}
+  .choose.blue h3{color:var(--blue)}
+  .choose.red h3{color:var(--red)}
+  .choose p{margin:0; color:var(--fg); font-size:14.5px}
+  .choose .k{font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); display:block; margin-bottom:10px}
 
-  /* ---- panels ---- */
-  .panel{
-    background:var(--panel); border:1px solid var(--line); border-radius:4px;
-    padding:20px; margin-bottom:18px;
-  }
+  /* ---- sections ---- */
+  .sec{padding:44px 0 8px}
+  .sec h2{font-family:var(--mono); font-size:21px; margin:0 0 6px; font-weight:650; letter-spacing:-.01em; text-wrap:balance}
+  .sec-sub{color:var(--mut); font-size:14.5px; margin:0 0 22px; max-width:70ch}
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px; margin-bottom:16px}
   .panel-h{
-    font-family:var(--mono); font-size:11.5px; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--mut); margin:0 0 4px;
-    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--dim); margin:0 0 6px; display:flex; justify-content:space-between; align-items:center;
   }
-  .panel-h .rd{color:var(--teal)}
   figure{margin:0}
-  figcaption{font-size:13px; color:var(--mut); margin-top:12px; font-family:var(--sans)}
-  figcaption b{color:#cfcabb; font-weight:600}
+  figcaption{font-size:13px; color:var(--mut); margin-top:12px}
+  figcaption b{color:var(--fg); font-weight:600}
+  .illus{font-family:var(--mono); font-size:10.5px; color:var(--dim)}
 
   svg{display:block; width:100%; height:auto}
-  .axt{font-family:var(--mono); font-size:10px; fill:var(--mut-2)}
+  .axt{font-family:var(--mono); font-size:10px; fill:var(--dim)}
   .axl{font-family:var(--mono); font-size:10.5px; fill:var(--mut)}
   .gl{stroke:var(--line); stroke-width:1}
 
-  /* prefill/decode rows */
-  .phase{display:grid; grid-template-columns:90px 1fr; gap:16px; align-items:center; padding:14px 0; border-top:1px solid var(--line)}
+  /* prefill/decode */
+  .phase{display:grid; grid-template-columns:96px 1fr; gap:16px; align-items:center; padding:16px 0; border-top:1px solid var(--line)}
   .phase:first-of-type{border-top:0}
   .phase .nm{font-family:var(--mono); font-weight:600; font-size:14px}
-  .phase .nm small{display:block; color:var(--mut-2); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; margin-top:3px; font-weight:400}
-  .meter{display:grid; grid-template-columns:1fr auto; gap:10px 14px; align-items:center}
+  .phase .nm small{display:block; color:var(--dim); font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-top:4px; font-weight:400}
+  .meter{display:grid; grid-template-columns:1fr auto; gap:9px 14px; align-items:center}
   .meter .lab{font-family:var(--mono); font-size:11px; color:var(--mut)}
-  .meter .val{font-family:var(--mono); font-size:13px; text-align:right}
-  .bar{grid-column:1/-1; height:8px; background:var(--panel-2); border-radius:2px; overflow:hidden; border:1px solid var(--line)}
+  .meter .val{font-family:var(--mono); font-size:13px; text-align:right; color:var(--fg)}
+  .bar{grid-column:1/-1; height:8px; background:var(--panel-2); border-radius:3px; overflow:hidden; border:1px solid var(--line)}
   .bar i{display:block; height:100%}
-  .bar.compute i{background:linear-gradient(90deg,#ffb02e,#ff8a3d)}
-  .bar.memory i{background:linear-gradient(90deg,#54d1c0,#3aa9b8)}
-  .tag{font-family:var(--mono); font-size:10.5px; padding:2px 7px; border-radius:2px; border:1px solid currentColor}
-  .tag.c{color:var(--amber)}
-  .tag.m{color:var(--teal)}
+  .bar.compute i{background:linear-gradient(90deg,var(--green),#1f9d63)}
+  .bar.memory i{background:linear-gradient(90deg,var(--blue),#2b5bbd)}
+  .tag{font-family:var(--mono); font-size:10.5px; padding:2px 8px; border-radius:3px; border:1px solid currentColor}
+  .tag.c{color:var(--green)}
+  .tag.m{color:var(--blue)}
 
-  /* methodology callout */
-  .note{border-left:2px solid var(--amber); padding:4px 0 4px 18px; margin:6px 0}
-  .note h3{font-size:15.5px; margin:0 0 8px}
-  .note p{color:#c5c0b2; font-size:14.5px; margin:0 0 8px; max-width:64ch}
-  .note p:last-child{margin-bottom:0}
-  .note code{font-family:var(--mono); font-size:12.5px; color:var(--teal); background:var(--panel-2); padding:1px 5px; border-radius:3px}
+  /* methodology list — full-border rows, no side stripes */
+  .method{display:grid; gap:10px}
+  .method .row{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:15px 17px}
+  .method .row h4{margin:0 0 5px; font-size:14.5px; font-family:var(--mono); color:var(--fg)}
+  .method .row p{margin:0; color:var(--mut); font-size:14px; max-width:74ch}
+  .method code{font-family:var(--mono); font-size:12.5px; color:var(--green)}
 
-  /* finding strip */
-  .finding{
-    background:linear-gradient(180deg,var(--panel-2),var(--panel));
-    border:1px solid var(--line); border-left:3px solid var(--amber);
-    border-radius:4px; padding:22px 24px; margin:8px 0 4px;
+  /* terminal cards (certify / predict) */
+  .term{
+    background:#05080d; border:1px solid var(--line); border-radius:6px;
+    font-family:var(--mono); font-size:12.5px; line-height:1.7; color:#c6d2de; overflow-x:auto;
   }
-  .finding .k{font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--amber); margin:0 0 10px}
-  .finding p{margin:0; font-size:18px; line-height:1.45}
-  .finding .num{font-family:var(--mono); color:var(--teal); font-weight:600}
+  .term .bar-top{display:flex; gap:7px; align-items:center; padding:9px 13px; border-bottom:1px solid var(--line)}
+  .term .bar-top i{width:10px; height:10px; border-radius:50%; display:inline-block}
+  .term .bar-top .t{margin-left:8px; color:var(--dim); font-size:11px}
+  .term pre{margin:0; padding:15px 17px; white-space:pre; overflow-x:auto}
+  .g{color:var(--green)} .b{color:var(--blue)} .r{color:var(--red)} .d{color:var(--dim)}
+  .prompt{color:var(--green)}
 
-  /* certify verdict card */
-  .card{
-    background:#0e0d0b; border:1px solid var(--line); border-radius:3px;
-    padding:16px 18px; font-family:var(--mono); font-size:12.5px; line-height:1.75;
-    color:#cfcabb; overflow-x:auto; white-space:pre;
-  }
-  .card .ok{color:var(--teal)}
-  .card .low{color:var(--amber)}
-  .card .bad{color:var(--coral)}
-  .card .dim{color:var(--mut-2)}
+  /* results table */
+  .tbl{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13px}
+  .tbl th,.tbl td{padding:9px 12px; text-align:right; border-bottom:1px solid var(--line)}
+  .tbl th{color:var(--dim); font-weight:500; font-size:11px; letter-spacing:.06em; text-transform:uppercase}
+  .tbl td:first-child,.tbl th:first-child{text-align:left}
+  .tbl tr.knee td{background:rgba(63,240,138,.06)}
+  .tbl .v-trust{color:var(--green)} .tbl .v-under{color:var(--red)}
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:6px; background:var(--panel)}
 
-  /* footer */
-  footer{border-top:1px solid var(--line); margin-top:54px; padding:26px 0 60px; font-family:var(--mono); font-size:12.5px; color:var(--mut)}
-  .repro{background:#0e0d0b; border:1px solid var(--line); border-radius:3px; padding:13px 16px; color:#cfcabb; margin:0 0 16px; overflow-x:auto}
-  .repro .p{color:var(--amber)}
-  footer a{color:var(--teal); text-decoration:none}
+  footer{border-top:1px solid var(--line); margin-top:52px; padding:26px 0 60px; font-family:var(--mono); font-size:12.5px; color:var(--mut)}
+  .repro{background:#05080d; border:1px solid var(--line); border-radius:5px; padding:13px 16px; color:#c6d2de; margin:0 0 16px; overflow-x:auto; white-space:pre}
+  .repro .prompt{color:var(--green)}
 
-  :focus-visible{outline:2px solid var(--amber); outline-offset:2px}
+  :focus-visible{outline:2px solid var(--green); outline-offset:2px}
 
-  @media (max-width:560px){
+  @media (max-width:640px){
+    .choice{grid-template-columns:1fr}
     .phase{grid-template-columns:1fr; gap:10px}
-    .cfg div{flex:1 1 50%; border-bottom:1px solid var(--line)}
+    .cfg div{flex:1 1 45%}
   }
-
   @keyframes draw{from{stroke-dashoffset:var(--len)} to{stroke-dashoffset:0}}
-  @keyframes pulse{0%,100%{r:5} 50%{r:7}}
-  .p99trace{stroke-dasharray:var(--len); stroke-dashoffset:var(--len); animation:draw 1.4s .3s ease-out forwards}
-  .knee{animation:pulse 2.4s ease-in-out infinite}
+  .p99trace{stroke-dasharray:var(--len); stroke-dashoffset:var(--len); animation:draw 1.5s .3s cubic-bezier(.22,1,.36,1) forwards}
   @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
     .p99trace{animation:none; stroke-dashoffset:0}
-    .knee{animation:none}
+    #rain{display:none}
   }
 </style>
 </head>
@@ -167,267 +181,317 @@
 
 <div class="wrap">
 
-  <!-- status bar : reads like an instrument header -->
   <div class="status">
     <span class="mark">Morph<b>eus</b></span>
-    <span class="pill">vLLM 0.x</span>
+    <span class="pill-tag">vLLM 0.24</span>
     <span class="sep"></span>
-    <span>llama&#8209;3.1&#8209;8b&#8209;instruct</span>
-    <span>&middot;</span>
-    <span>1&times; A100&#8209;80GB</span>
-    <span>&middot;</span>
-    <span class="blink">&#9679; steady&#8209;state</span>
+    <span>qwen2.5&#8209;1.5b</span><span>&middot;</span>
+    <span>1&times; Tesla&nbsp;T4</span><span>&middot;</span>
+    <span class="dotred">red&#8209;pill</span>
   </div>
 
-  <!-- HERO : thesis, not a dashboard -->
+  <!-- HERO -->
   <header class="hero">
-    <p class="eyebrow">LLM serving characterization &mdash; performance report</p>
-    <h1>Latency is a <span class="t">distribution</span>, and the <span class="a">tail</span> is where serving breaks.</h1>
-    <p class="lede">
-      A reproducible harness that decomposes inference into compute&#8209;bound <em>prefill</em>
-      and memory&#8209;bound <em>decode</em>, then treats per&#8209;request latency as a stochastic
-      process across batching and concurrency regimes &mdash; mapping the throughput / latency
-      Pareto frontier and the point where p99 detaches from the mean. And it doesn&rsquo;t just
-      report the numbers: <code style="font-family:var(--mono); font-size:14px; color:var(--teal)">certify</code>
-      issues a verdict on whether they deserve to be believed.
-    </p>
-    <div class="cfg">
-      <div><span>Backend</span><strong>vLLM &middot; continuous batching</strong></div>
-      <div><span>Sweep</span><strong>concurrency 1 &rarr; 48</strong></div>
-      <div><span>Workload</span><strong>512 in / 256 out</strong></div>
-      <div><span>Samples</span><strong>2,000 req / point</strong></div>
+    <canvas id="rain" aria-hidden="true"></canvas>
+    <div class="hero-inner">
+      <div class="hero-logo"><img src="logo.png" alt="Two hands offering a red pill and a blue pill"></div>
+      <p class="eyebrow">LLM serving characterization &mdash; take the red pill</p>
+      <h1>The <span class="blue">average</span> is the dream.<br>The <span class="red">tail</span> is the desert of the real.</h1>
+      <p class="lede">
+        Morpheus is a reproducible harness that treats per&#8209;request latency as a stochastic
+        process &mdash; splitting compute&#8209;bound prefill from memory&#8209;bound decode, mapping the
+        throughput / latency frontier, and refusing to collapse a distribution into one comfortable
+        number. It doesn&rsquo;t just report the numbers; it tells you whether to believe them.
+      </p>
+      <div class="cfg">
+        <div><span>Backend</span><strong>vLLM 0.24 · eager</strong></div>
+        <div><span>Model</span><strong>Qwen2.5-1.5B</strong></div>
+        <div><span>GPU</span><strong>1× Tesla T4</strong></div>
+        <div><span>Workload</span><strong>512 in / 256 out</strong></div>
+        <div><span>Knee</span><strong>concurrency 8</strong></div>
+      </div>
     </div>
   </header>
 
-  <!-- headline finding -->
-  <div class="finding">
-    <p class="k">Headline result</p>
-    <p>
-      Past the knee, system throughput gains <span class="num">+5%</span> while
-      <span class="num">p99</span> inter&#8209;token latency degrades
-      <span class="num">4.4&times;</span> (110&nbsp;ms &rarr; 480&nbsp;ms).
-      The mean hides it; the distribution doesn&rsquo;t.
-    </p>
-  </div>
+  <!-- THE CHOICE -->
+  <section class="sec" aria-label="The choice">
+    <div class="choice">
+      <div class="choose blue">
+        <span class="k">The blue pill</span>
+        <h3>Report the mean</h3>
+        <p>Collapse the run to one number, call the service fast, and wake up believing it.
+        The median barely moves under load &mdash; so an averaged benchmark always reads
+        &ldquo;fine.&rdquo; Morpheus never emits this number alone.</p>
+      </div>
+      <div class="choose red">
+        <span class="k">The red pill</span>
+        <h3>Keep the whole distribution</h3>
+        <p>Stay for p50&nbsp;/&nbsp;p95&nbsp;/&nbsp;p99, the autocorrelation, and the verdict on whether
+        the run was even long enough to trust. See how deep the tail goes &mdash; and where it
+        detaches from the mean.</p>
+      </div>
+    </div>
+  </section>
 
-  <!-- SECTION 1 : prefill / decode -->
+  <!-- PREFILL / DECODE -->
   <section class="sec">
-    <div class="sec-h"><span class="idx">01</span><h2>Prefill vs. decode: two different machines</h2></div>
+    <h2>Prefill vs. decode: two different machines</h2>
     <p class="sec-sub">
-      The roofline split. Prefill saturates the GPU (compute&#8209;bound); decode leaves it
-      mostly idle and waits on memory bandwidth. Optimizing inference means optimizing decode.
+      Inference is two workloads glued together. Prefill ingests the whole prompt at once and
+      saturates the GPU (compute&#8209;bound). Decode emits one token at a time and leaves the GPU
+      mostly idle, gated by memory bandwidth. Utilization is sampled on the same clock as every
+      request, so the memory&#8209;bound claim is measured, not asserted.
     </p>
-
     <div class="panel">
-      <p class="panel-h"><span>phase decomposition</span><span class="rd">util &middot; latency</span></p>
-
+      <p class="panel-h"><span>phase decomposition</span><span>util · latency</span></p>
       <div class="phase">
         <div class="nm">PREFILL<small>per request</small></div>
         <div>
           <div class="meter">
-            <span class="lab">TTFT (512&#8209;tok prompt)</span><span class="val">62 ms</span>
-            <span class="lab">SM utilization</span><span class="val" style="color:var(--amber)">94%</span>
-            <div class="bar compute"><i style="width:94%"></i></div>
+            <span class="lab">TTFT (512&#8209;tok prompt, c8)</span><span class="val">70 ms</span>
+            <span class="lab">SM utilization</span><span class="val" style="color:var(--green)">~50%</span>
+            <div class="bar compute"><i style="width:50%"></i></div>
           </div>
-          <div style="margin-top:10px"><span class="tag c">compute&#8209;bound &middot; high arithmetic intensity</span></div>
+          <div style="margin-top:10px"><span class="tag c">compute&#8209;bound · high arithmetic intensity</span></div>
         </div>
       </div>
-
       <div class="phase">
         <div class="nm">DECODE<small>per token</small></div>
         <div>
           <div class="meter">
-            <span class="lab">ITL (steady&#8209;state)</span><span class="val">21 ms</span>
-            <span class="lab">SM utilization</span><span class="val" style="color:var(--teal)">34%</span>
-            <div class="bar memory"><i style="width:34%"></i></div>
+            <span class="lab">ITL (steady&#8209;state, c8)</span><span class="val">19.9 ms</span>
+            <span class="lab">Memory&#8209;controller busy</span><span class="val" style="color:var(--blue)">~42%</span>
+            <div class="bar memory"><i style="width:42%"></i></div>
           </div>
-          <div style="margin-top:10px"><span class="tag m">memory&#8209;bandwidth&#8209;bound &middot; GPU starved</span></div>
+          <div style="margin-top:10px"><span class="tag m">memory&#8209;bandwidth&#8209;bound · GPU starved</span></div>
         </div>
       </div>
     </div>
+    <p class="illus">Real values from the committed Qwen2.5-1.5B / T4 run. A 1.5B model doesn't saturate a T4 — the sharper decode-bound story wants a 7B+ run.</p>
   </section>
 
-  <!-- SECTION 2 : pareto -->
+  <!-- PARETO -->
   <section class="sec">
-    <div class="sec-h"><span class="idx">02</span><h2>The throughput / latency Pareto frontier</h2></div>
+    <h2>The throughput / latency frontier</h2>
     <p class="sec-sub">
-      Sweeping concurrency traces the frontier every serving deployment negotiates. The knee
-      is the honest operating point &mdash; beyond it you buy throughput with tail latency.
+      Sweeping concurrency traces the frontier every deployment negotiates. Throughput climbs
+      steeply, then the tail starts charging for each extra token. The <b>knee</b> is the honest
+      operating point &mdash; Morpheus finds it automatically. Here: <b>concurrency 8</b>.
     </p>
     <div class="panel">
-      <p class="panel-h"><span>concurrency sweep</span><span class="rd">tput vs p99</span></p>
+      <p class="panel-h"><span>concurrency sweep · real data</span><span>tput vs p99 ITL</span></p>
       <figure>
-        <svg viewBox="0 0 600 320" role="img" aria-label="Throughput versus p99 latency Pareto curve; throughput saturates near 640 tokens per second while p99 latency rises sharply past the knee at concurrency 16.">
-          <!-- grid -->
+        <svg viewBox="0 0 600 320" role="img" aria-label="Throughput versus p99 inter-token latency. Throughput rises from 48 to 648 tokens per second while p99 ITL stays low until it climbs past the knee at concurrency 8.">
           <g class="gl">
-            <line x1="60" y1="30" x2="60" y2="270"/>
-            <line x1="60" y1="270" x2="560" y2="270"/>
-            <line x1="60" y1="210" x2="560" y2="210" opacity=".5"/>
-            <line x1="60" y1="150" x2="560" y2="150" opacity=".5"/>
-            <line x1="60" y1="90"  x2="560" y2="90"  opacity=".5"/>
+            <line x1="70" y1="40" x2="70" y2="270"/>
+            <line x1="70" y1="270" x2="560" y2="270"/>
+            <line x1="70" y1="212" x2="560" y2="212" opacity=".5"/>
+            <line x1="70" y1="155" x2="560" y2="155" opacity=".5"/>
+            <line x1="70" y1="98"  x2="560" y2="98"  opacity=".5"/>
           </g>
-          <!-- y ticks (throughput) -->
           <g class="axt" text-anchor="end">
-            <text x="52" y="274">0</text>
-            <text x="52" y="214">175</text>
-            <text x="52" y="154">350</text>
-            <text x="52" y="94">525</text>
-            <text x="52" y="44">700</text>
+            <text x="62" y="274">0</text><text x="62" y="216">175</text>
+            <text x="62" y="159">350</text><text x="62" y="102">525</text><text x="62" y="44">700</text>
           </g>
-          <text class="axl" x="16" y="150" transform="rotate(-90 16 150)" text-anchor="middle">throughput &mdash; tok/s</text>
-          <!-- x ticks (p99 latency) -->
+          <text class="axl" x="20" y="155" transform="rotate(-90 20 155)" text-anchor="middle">throughput — tok/s</text>
           <g class="axt" text-anchor="middle">
-            <text x="83"  y="286">24</text>
-            <text x="166" y="286">110</text>
-            <text x="290" y="286">240</text>
-            <text x="521" y="286">480</text>
+            <text x="408" y="286">22</text><text x="335" y="286">17</text>
+            <text x="401" y="286">22</text><text x="502" y="286">28</text>
           </g>
-          <text class="axl" x="310" y="308" text-anchor="middle">p99 inter&#8209;token latency &mdash; ms</text>
-          <!-- frontier -->
-          <path d="M83,254 L87,239 L94,210 L113,160 L166,92 L290,61 L521,51"
-                fill="none" stroke="var(--teal)" stroke-width="2.2"/>
-          <g fill="var(--teal)">
-            <circle cx="83" cy="254" r="3.4"/><circle cx="87" cy="239" r="3.4"/>
-            <circle cx="94" cy="210" r="3.4"/><circle cx="113" cy="160" r="3.4"/>
-            <circle cx="290" cy="61" r="3.4"/><circle cx="521" cy="51" r="3.4"/>
+          <text class="axl" x="315" y="308" text-anchor="middle">p99 inter-token latency — ms</text>
+          <polyline points="408,254 335,231 355,196 401,139 502,57" fill="none" stroke="var(--blue)" stroke-width="2.2"/>
+          <g fill="var(--blue)">
+            <circle cx="408" cy="254" r="3.4"/><circle cx="335" cy="231" r="3.4"/>
+            <circle cx="355" cy="196" r="3.4"/><circle cx="502" cy="57" r="3.4"/>
           </g>
-          <!-- knee -->
-          <circle class="knee" cx="166" cy="92" r="5" fill="none" stroke="var(--amber)" stroke-width="2"/>
-          <circle cx="166" cy="92" r="2.4" fill="var(--amber)"/>
-          <text class="axl" x="178" y="88" fill="var(--amber)">&#9664; knee &middot; conc 16</text>
-          <text class="axt" x="300" y="46" fill="var(--mut)">throughput saturates &asymp; 640 tok/s</text>
+          <circle cx="401" cy="139" r="6" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <circle cx="401" cy="139" r="2.6" fill="var(--green)"/>
+          <text class="axl" x="388" y="132" fill="var(--green)" text-anchor="end">knee · c8 ◂</text>
+          <text class="axt" x="470" y="52" fill="var(--mut)">648 tok/s @ c16</text>
         </svg>
-        <figcaption><b>Read it up&#8209;and&#8209;left.</b> Throughput flattens long before latency does; everything right of the knee is paying tail latency for almost no extra tokens.</figcaption>
+        <figcaption><b>Read it up-and-left.</b> Everything past the knee buys throughput with tail latency; c1 sits high-left because a lone request pays per-call overhead with no batching benefit.</figcaption>
       </figure>
     </div>
   </section>
 
-  <!-- SECTION 3 : tail latency (signature) -->
+  <!-- MEAN vs P99 : the pill chart -->
   <section class="sec">
-    <div class="sec-h"><span class="idx">03</span><h2>Where the mean lies: p50 vs p99 under load</h2></div>
+    <h2>Where the mean lies: p50 vs. p99</h2>
     <p class="sec-sub">
-      The signature finding. As concurrency rises the median barely moves &mdash; so an
-      averaged benchmark reports &ldquo;fine.&rdquo; Meanwhile p99 detaches and climbs an order of magnitude.
-      <br>
-      <span style="color:#5b8cff; font-weight:600">Blue pill</span> is that flat median &mdash; the
-      comfortable story. <span style="color:var(--coral); font-weight:600">Red pill</span> is the tail
-      it hides. Morpheus only serves the red one.
+      The signature view, and the literal pill choice.
+      <b style="color:var(--blue)">Blue</b> is the median — the comfortable story.
+      <b style="color:var(--red)">Red</b> is the p99 tail it hides. As load rises the gap opens:
+      the tail detaches and climbs while the median stays calm.
     </p>
     <div class="panel">
-      <p class="panel-h"><span>latency percentiles</span><span class="rd">p50 / p99</span></p>
+      <p class="panel-h"><span>ITL percentiles · real data</span><span>p50 / p99</span></p>
       <figure>
-        <svg viewBox="0 0 600 320" role="img" aria-label="Two latency traces against concurrency; the p50 median stays nearly flat near the bottom while the p99 tail rises steeply.">
+        <svg viewBox="0 0 600 320" role="img" aria-label="Inter-token latency p50 and p99 against concurrency. The blue p50 median stays near 20 milliseconds while the red p99 tail rises to 28 at concurrency 16, opening a gap.">
           <g class="gl">
-            <line x1="60" y1="30" x2="60" y2="270"/>
-            <line x1="60" y1="270" x2="560" y2="270"/>
-            <line x1="60" y1="210" x2="560" y2="210" opacity=".5"/>
-            <line x1="60" y1="150" x2="560" y2="150" opacity=".5"/>
-            <line x1="60" y1="90"  x2="560" y2="90"  opacity=".5"/>
+            <line x1="70" y1="40" x2="70" y2="270"/>
+            <line x1="70" y1="270" x2="560" y2="270"/>
+            <line x1="70" y1="212" x2="560" y2="212" opacity=".5"/>
+            <line x1="70" y1="155" x2="560" y2="155" opacity=".5"/>
+            <line x1="70" y1="98"  x2="560" y2="98"  opacity=".5"/>
           </g>
           <g class="axt" text-anchor="end">
-            <text x="52" y="274">0</text><text x="52" y="214">125</text>
-            <text x="52" y="154">250</text><text x="52" y="94">375</text>
-            <text x="52" y="44">500</text>
+            <text x="62" y="274">0</text><text x="62" y="216">8</text>
+            <text x="62" y="159">16</text><text x="62" y="102">24</text><text x="62" y="44">32</text>
           </g>
-          <text class="axl" x="16" y="150" transform="rotate(-90 16 150)" text-anchor="middle">ITL &mdash; ms</text>
+          <text class="axl" x="20" y="155" transform="rotate(-90 20 155)" text-anchor="middle">ITL — ms</text>
           <g class="axt" text-anchor="middle">
-            <text x="60" y="286">1</text><text x="140" y="286">2</text>
-            <text x="220" y="286">4</text><text x="300" y="286">8</text>
-            <text x="380" y="286">16</text><text x="460" y="286">32</text>
-            <text x="540" y="286">48</text>
+            <text x="70" y="286">1</text><text x="192" y="286">2</text><text x="315" y="286">4</text>
+            <text x="438" y="286">8</text><text x="560" y="286">16</text>
           </g>
-          <text class="axl" x="310" y="308" text-anchor="middle">concurrent requests</text>
-
-          <!-- p50 : nearly flat -->
-          <path d="M60,260 L140,259 L220,259 L300,257 L380,252 L460,240 L540,224"
-                fill="none" stroke="var(--teal)" stroke-width="2.2"/>
-          <!-- p99 : explodes -->
-          <path class="p99trace" style="--len:560"
-                d="M60,259 L140,257 L220,253 L300,244 L380,217 L460,155 L540,40"
-                fill="none" stroke="var(--amber)" stroke-width="2.6"/>
-
-          <!-- labels -->
-          <text class="axl" x="544" y="222" fill="var(--teal)" text-anchor="end">p50 &mdash; flat</text>
-          <text class="axl" x="544" y="34"  fill="var(--amber)" text-anchor="end">p99 &mdash; 480 ms</text>
-          <circle cx="540" cy="224" r="3.2" fill="var(--teal)"/>
-          <circle cx="540" cy="40" r="3.6" fill="var(--amber)"/>
+          <text class="axl" x="315" y="308" text-anchor="middle">concurrent requests</text>
+          <!-- p50 blue (the comfortable median) -->
+          <polyline points="70,123 192,151 315,144 438,127 560,95" fill="none" stroke="var(--blue)" stroke-width="2.4"/>
+          <g fill="var(--blue)"><circle cx="70" cy="123" r="3.2"/><circle cx="192" cy="151" r="3.2"/><circle cx="315" cy="144" r="3.2"/><circle cx="438" cy="127" r="3.2"/><circle cx="560" cy="95" r="3.2"/></g>
+          <!-- p99 red (the tail) -->
+          <polyline class="p99trace" style="--len:520" points="70,111 192,146 315,136 438,115 560,67" fill="none" stroke="var(--red)" stroke-width="2.6"/>
+          <g fill="var(--red)"><circle cx="70" cy="111" r="3.4"/><circle cx="560" cy="67" r="4"/></g>
+          <text class="axl" x="556" y="110" fill="var(--blue)" text-anchor="end">p50 · blue pill</text>
+          <text class="axl" x="556" y="60" fill="var(--red)" text-anchor="end">p99 · red pill</text>
         </svg>
-        <figcaption><b>The gap is the story.</b> Reporting a single averaged number would have erased a <b>4.4&times;</b> tail&#8209;latency regression.</figcaption>
+        <figcaption><b>The gap is the story.</b> On a 1.5B / T4 the spread is modest but real (p99/p50 widens from ~1.05 to ~1.16 by c16); the mean would have erased even that. Morpheus reports the whole distribution, always.</figcaption>
       </figure>
     </div>
   </section>
 
-  <!-- SECTION 4 : methodology -->
+  <!-- METHODOLOGY -->
   <section class="sec">
-    <div class="sec-h"><span class="idx">04</span><h2>Methodology: why one number lies</h2></div>
-    <div class="panel">
-      <div class="note">
-        <h3>Latency is a correlated process, not i.i.d. samples</h3>
-        <p>
-          Consecutive request latencies are coupled through KV&#8209;cache occupancy and scheduler
-          state, so naive averaging understates uncertainty. The harness reports the full
-          distribution, measures the <code>autocorrelation</code> between successive requests,
-          and runs an Allan&#8209;variance&#8209;style convergence check to find the
-          <code>averaging window</code> at which throughput actually stabilizes.
-        </p>
-        <p>
-          Warmup is detected and discarded automatically rather than by eye, and every point is
-          reported with p50 / p95 / p99 plus a stability flag &mdash; so the numbers are honest
-          under load, not just on a quiet GPU.
-        </p>
-        <p>
-          <code>Coordinated omission</code>, addressed: a closed&#8209;loop worker pool slows its
-          arrivals whenever the server slows down, silently understating the tail. The harness
-          also runs an <code>open&#8209;loop Poisson</code> sweep &mdash; arrival times pre&#8209;drawn,
-          seeded, never conditioned on completions &mdash; so queueing delay lands in TTFT/ITL where
-          it belongs. And utilization is <em>measured</em>, not asserted: a background sampler logs
-          SM&#8209;busy and memory&#8209;controller&#8209;busy % on the same clock as every request.
-        </p>
+    <h2>Why one number lies</h2>
+    <p class="sec-sub">The credibility <em>is</em> the product. Four methods, each a named, defensible technique from stochastic-process characterization.</p>
+    <div class="method">
+      <div class="row">
+        <h4>Latency is correlated, not i.i.d.</h4>
+        <p>Consecutive requests are coupled through KV-cache occupancy and scheduler state. Morpheus measures the <code>autocorrelation</code> and reports the integrated time <code>τ_int</code> — so 32k token events collapse to an <em>effective</em> sample size of a couple thousand. An i.i.d. error bar here is a lie.</p>
+      </div>
+      <div class="row">
+        <h4>Warmup is detected, not eyeballed</h4>
+        <p>The transient is found by the <code>MSER-5</code> changepoint rule and discarded — never a hardcoded &ldquo;drop first N.&rdquo;</p>
+      </div>
+      <div class="row">
+        <h4>Coordinated omission, addressed</h4>
+        <p>A closed loop slows its own arrivals when the server slows, hiding the tail. <code>--arrival-rate</code> runs an open-loop Poisson sweep with pre-drawn arrival times, so queueing delay lands in the measurement where it belongs.</p>
+      </div>
+      <div class="row">
+        <h4>Run length is justified</h4>
+        <p>An Allan-variance convergence check reports the request count at which throughput actually stabilizes — the run is as long as the statistics demand, not arbitrary.</p>
       </div>
     </div>
   </section>
 
-  <!-- SECTION 5 : certify -->
+  <!-- CERTIFY -->
   <section class="sec">
-    <div class="sec-h"><span class="idx">05</span><h2>Certify: should you believe your benchmark?</h2></div>
+    <h2>Certify — should you believe your benchmark?</h2>
     <p class="sec-sub">
-      Every harness will print &ldquo;p99 = 212&nbsp;ms.&rdquo; None will tell you whether that number is a
-      statistic or an anecdote. <code style="font-family:var(--mono); color:var(--teal)">morpheus certify</code>
-      turns the stats layer into verdicts &mdash; and it referees <em>any</em> harness&rsquo;s raw
-      latencies, not just its own.
+      Every harness prints &ldquo;p99 = 61 ms.&rdquo; None tell you whether that&rsquo;s a statistic or an
+      anecdote. <code style="font-family:var(--mono);color:var(--green)">morpheus certify</code> turns
+      the stats layer into verdicts — and it referees <em>any</em> harness&rsquo;s raw latencies, not just its own.
     </p>
-    <div class="panel">
-      <p class="panel-h"><span>$ morpheus certify --raw results/raw</span><span class="rd">verdict</span></p>
-      <div class="card">&#9472;&#9472; ITL  @ concurrency=8 &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
-n=32640 &rarr; warmup 160 dropped &rarr; steady 32480
-tau_int=4.2 &rarr; effective sample size 7733    <span class="dim">(not 32480 &mdash; requests are correlated)</span>
-mean 24.3 ms &plusmn;1.1% (95% CI)                 <span class="ok">OK</span>
-p99 61.0 ms, tail support 77.3 eff. samples  <span class="ok">OK</span>
-drift: halves differ 1.2% (z=0.9)            <span class="ok">OK</span>
-<span class="ok">VERDICT: TRUSTED</span>
+    <div class="term">
+      <div class="bar-top"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">morpheus certify --raw results/raw</span></div>
+<pre><span class="d">── ITL  @ concurrency=8 ──────────────────────────────</span>
+n=32640 → warmup 160 dropped → steady 32480
+tau_int=<span class="b">4.2</span> → effective sample size <span class="b">7733</span>   <span class="d">(not 32480 — correlated)</span>
+p99 21.6 ms, tail support 77 eff. samples        <span class="g">OK</span>
+drift: halves differ 0.1% (z=-0.7)               <span class="g">OK</span>
+VERDICT: <span class="g">TRUSTED</span>
 
-&#9472;&#9472; TTFT @ concurrency=32 &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
-n=256 &rarr; warmup 25 dropped &rarr; steady 231
-tau_int=6.8 &rarr; effective sample size 34
-p99 890 ms, tail support 0.3 eff. samples    <span class="low">LOW  (need ~6800 steady requests)</span>
-<span class="low">VERDICT: UNDERPOWERED</span> <span class="dim">&mdash; that p99 is a dice roll, not a percentile</span></div>
-      <figcaption style="font-size:13px; color:var(--mut); margin-top:12px">
-        <b style="color:#cfcabb">Three failure modes it catches</b> &mdash; each leaves the reported number
-        looking perfectly normal: <b style="color:#cfcabb">UNDERPOWERED</b> (autocorrelation shrinks n to an
-        effective n/&tau;; too few effective tail samples), <b style="color:#cfcabb">NONSTATIONARY</b>
-        (run halves disagree beyond their error bars &mdash; thermal throttle, noisy neighbor on a shared GPU),
-        and warmup&#8209;dominated runs. Exits non&#8209;zero unless everything is TRUSTED, so it gates CI.
-        guidellm and aiperf are stopwatches; this is the calibration lab.
-      </figcaption>
+<span class="d">── TTFT @ concurrency=16 ─────────────────────────────</span>
+n=128 → warmup 55 dropped → steady 73
+tau_int=2.0 → effective sample size 37
+p99 129 ms, tail support 0.4 eff. samples        <span class="r">LOW  (need ~2000 req)</span>
+VERDICT: <span class="r">UNDERPOWERED</span> <span class="d">— that p99 is a dice roll, not a percentile</span></pre>
     </div>
+    <p class="illus">Real verdicts from the committed run: every ITL series is TRUSTED; every TTFT p99 is UNDERPOWERED at 128 requests. The benchmark grades its own numbers — and publishes the ones it doesn't yet trust, flagged.</p>
+  </section>
+
+  <!-- PREDICT -->
+  <section class="sec">
+    <h2>Predict — operating points you never ran</h2>
+    <p class="sec-sub">
+      <code style="font-family:var(--mono);color:var(--green)">morpheus predict</code> fits the
+      Universal Scalability Law to the sweep and predicts throughput at un-run concurrencies, with a
+      bootstrap band over the raw data and a hard <span class="b">INTERPOLATED</span> /
+      <span class="r">EXTRAPOLATED</span> label — because a wide band is easy to gloss over.
+    </p>
+    <div class="term">
+      <div class="bar-top"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">morpheus predict --raw results/raw --at 12,24,32</span></div>
+<pre> concurrency  throughput_tok_s   band(95%)      region
+          12             540      538 – 540   <span class="b">INTERPOLATED</span>
+          24             792      792 – 805   <span class="r">EXTRAPOLATED ⚠</span>
+          32             870      869 – 905   <span class="r">EXTRAPOLATED ⚠</span>
+
+<span class="d">USL: α=0.025 (contention), β=0.0004 (coherency)</span>
+predicted throughput-optimal concurrency: <span class="g">~48</span>  <span class="d">(extrapolated from data reaching 16)</span></pre>
+    </div>
+    <p class="illus">Measured to concurrency 16; the model predicts the throughput peak sits near 48 — flagged as extrapolation. Neither the load-generators nor the prediction literature ship this in a runnable form.</p>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="sec">
+    <h2>The committed run</h2>
+    <p class="sec-sub">
+      Qwen2.5-1.5B-Instruct · fp16 · vLLM 0.24.0 · 1× Tesla T4, on a free Kaggle GPU. 128 requests ×
+      5 concurrency points. Every figure above is derived from this raw per-request data —
+      provenance in <code style="font-family:var(--mono);color:var(--green)">run_meta.json</code>.
+    </p>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>conc</th><th>tok/s</th><th>ITL p50</th><th>ITL p99</th><th>TTFT p50</th><th>TTFT p99</th><th>ITL certify</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>48</td><td>20.4</td><td>22.1</td><td>110</td><td>115</td><td class="v-under">under</td></tr>
+          <tr><td>2</td><td>120</td><td>16.6</td><td>17.3</td><td>52</td><td>62</td><td class="v-trust">trusted</td></tr>
+          <tr><td>4</td><td>224</td><td>17.6</td><td>18.6</td><td>49</td><td>55</td><td class="v-trust">trusted</td></tr>
+          <tr class="knee"><td>8</td><td>398</td><td>19.9</td><td>21.6</td><td>70</td><td>85</td><td class="v-trust">trusted ◂ knee</td></tr>
+          <tr><td>16</td><td>648</td><td>24.3</td><td>28.2</td><td>88</td><td>129</td><td class="v-trust">trusted</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="illus">Every TTFT p99 here is UNDERPOWERED (128 req → ~1 effective tail sample). Publishing the number <em>with</em> the verdict that it isn't trustworthy yet is the methodology working as designed.</p>
   </section>
 
   <footer>
-    <div class="repro"><span class="p">$</span> ./reproduce.sh --model Qwen/Qwen2.5-7B-Instruct --sweep concurrency &amp;&amp; morpheus certify --raw results/raw</div>
-    <div>Morpheus &middot; methodology + harness + committed results &middot; <a href="https://github.com/wuisabel-gif/Morpheus">github.com/wuisabel-gif/Morpheus</a></div>
-    <div style="color:var(--mut-2); margin-top:8px">mockup &middot; numbers are illustrative placeholders</div>
+    <div class="repro"><span class="prompt">$</span> ./reproduce.sh --model Qwen/Qwen2.5-7B-Instruct --sweep concurrency
+<span class="prompt">$</span> morpheus certify --raw results/raw   <span class="d"># should you believe it?</span></div>
+    <div>Morpheus &middot; measure · certify · predict &middot; <a href="https://github.com/wuisabel-gif/Morpheus">github.com/wuisabel-gif/Morpheus</a></div>
+    <div style="color:var(--dim); margin-top:8px">Charts are derived from the committed T4 run. There is no spoon; there is only the distribution.</div>
   </footer>
 
 </div>
+
+<script>
+// Subtle Matrix digital rain, scoped to the hero canvas. Dim, capped, reduced-motion aware.
+(function(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.getElementById('rain'); if (!c) return;
+  const ctx = c.getContext('2d');
+  const chars = 'ｱｲｳｴｵｶｷｸ01ﾊﾋﾎ10ﾂﾃ01ﾏﾐﾑ'.split('');
+  let cols, drops, W, H, cell = 16;
+  function size(){
+    const r = c.getBoundingClientRect();
+    W = c.width = Math.max(1, r.width|0); H = c.height = Math.max(1, r.height|0);
+    cols = Math.ceil(W/cell); drops = Array(cols).fill(0).map(()=>Math.random()*-40);
+  }
+  size(); addEventListener('resize', size);
+  let last = 0;
+  function frame(t){
+    if (t-last > 55){ last = t;
+      ctx.fillStyle = 'rgba(4,6,10,0.28)'; ctx.fillRect(0,0,W,H);
+      ctx.font = cell+'px ui-monospace, monospace';
+      for (let i=0;i<cols;i++){
+        ctx.fillStyle = Math.random()<0.03 ? '#8fffc4' : '#3ff08a';
+        ctx.fillText(chars[(Math.random()*chars.length)|0], i*cell, drops[i]*cell);
+        if (drops[i]*cell > H && Math.random()>0.975) drops[i]=0;
+        drops[i]++;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
 </body>
 </html>
