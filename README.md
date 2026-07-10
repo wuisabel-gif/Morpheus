@@ -161,6 +161,38 @@ tools' output can be checked against.
 
 ---
 
+## Predict — throughput at operating points you didn't run
+
+A sweep measures a handful of concurrencies. `decodebound predict` fits the
+**Universal Scalability Law** (throughput = λN / (1 + α(N−1) + βN(N−1)) — α is contention,
+β is coherency) and predicts the points you *didn't* run, with a bootstrap confidence band
+and a hard label for interpolation vs. extrapolation:
+
+```
+$ decodebound predict --raw results/raw --at 3,6,12,24,32
+ concurrency  throughput_tok_s  band_lo  band_hi       region
+           3             170.9    170.9    174.2 INTERPOLATED
+          12             539.5    538.0    539.5 INTERPOLATED
+          24             792.4    792.1    805.1 EXTRAPOLATED
+          32             869.8    869.1    904.5 EXTRAPOLATED
+Predicted throughput-optimal concurrency (knee): 47.8
+```
+
+Two things make it honest rather than a blind curve-fit:
+
+- **The band is a bootstrap over the raw per-request data**, not a fragile 5-point
+  covariance — resample requests within each point, re-fit, take the percentile band. It
+  widens where fewer (effective) samples backed a point, and blows up past the measured range.
+- **Extrapolation is labelled, never hidden.** Predictions outside the measured concurrency
+  range are tagged `EXTRAPOLATED` — the wide band alone is easy to gloss over, so it's named.
+  (The knee above, ~48, is itself an extrapolation from data that only reached 16 — trust it
+  accordingly.)
+
+This is measured-data-backed prediction of un-run operating points — something neither the
+load-generators nor the throughput-prediction literature ships in a runnable form.
+
+---
+
 ## Results
 
 First committed run: **Qwen2.5-1.5B-Instruct, fp16, vLLM 0.24.0, 1× Tesla T4** (a free Kaggle

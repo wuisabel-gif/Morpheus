@@ -6,6 +6,7 @@ Subcommands:
   analyze     load raw data, print the derived sweep table + the knee
   plot        regenerate the three figures from raw data
   certify     verdict per series: should you believe this benchmark?
+  predict     throughput at un-run concurrencies, with a confidence band
 """
 
 from __future__ import annotations
@@ -129,6 +130,30 @@ def cmd_certify(args: argparse.Namespace) -> int:
     return 0 if all(c.verdict == "TRUSTED" for c in certs) else 1
 
 
+def cmd_predict(args: argparse.Namespace) -> int:
+    import math
+
+    from analysis import decompose, predict
+
+    ns = [float(x) for x in args.at.split(",") if x.strip()]
+    df = decompose.load_raw(args.raw)
+    fit = predict.fit_from_raw(df)
+    table = predict.predict_table(df, ns, n_boot=args.boot, seed=args.seed)
+
+    with __import__("pandas").option_context("display.float_format", lambda v: f"{v:.1f}"):
+        print(table.to_string(index=False))
+    print(
+        f"\nUSL fit: lambda={fit.lam:.1f}, alpha={fit.alpha:.3f} (contention), "
+        f"beta={fit.beta:.4f} (coherency)"
+    )
+    print(f"Measured concurrency {fit.c_min:g}-{fit.c_max:g}; outside that is extrapolation.")
+    if math.isfinite(fit.knee):
+        print(f"Predicted throughput-optimal concurrency (knee): {fit.knee:.1f}")
+    else:
+        print("No interior knee — throughput saturates without going retrograde in this range.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="decodebound", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -169,6 +194,19 @@ def build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--raw", default="results/raw")
     pl.add_argument("--figures", default="results/figures")
     pl.set_defaults(func=cmd_plot)
+
+    pr = sub.add_parser(
+        "predict",
+        help="predict throughput at un-run concurrencies (USL fit + bootstrap band, "
+             "tagged INTERPOLATED / EXTRAPOLATED)",
+    )
+    pr.add_argument("--raw", default="results/raw")
+    pr.add_argument("--at", required=True,
+                    help="comma-separated concurrencies to predict, e.g. '3,6,12,24'")
+    pr.add_argument("--boot", type=int, default=1000,
+                    help="bootstrap resamples for the confidence band (default 1000)")
+    pr.add_argument("--seed", type=int, default=0)
+    pr.set_defaults(func=cmd_predict)
 
     ct = sub.add_parser(
         "certify",
