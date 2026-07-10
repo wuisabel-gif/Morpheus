@@ -2,6 +2,10 @@
 
 **A reproducible harness for characterizing LLM *serving* performance.**
 
+> This is your last chance. After this, there is no going back.
+> Take the **blue pill** — report the mean, wake up, and believe your service is fast.
+> Take the **red pill** — stay for the whole distribution, and see how deep the tail goes.
+
 Decompose inference into compute-bound prefill and memory-bound decode, map the
 throughput / latency Pareto frontier, and treat latency as a *distribution* — not a single
 averaged number that hides the tail.
