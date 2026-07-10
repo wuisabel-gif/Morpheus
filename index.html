@@ -48,6 +48,11 @@
   .mark{color:var(--fg); font-weight:700; letter-spacing:.02em}
   .mark b{color:var(--red)}
   .status .sep{flex:1}
+  .status a.gh{
+    border:1px solid var(--line); border-radius:2px; padding:3px 9px; color:var(--green);
+    text-decoration:none; transition:border-color .15s, background .15s;
+  }
+  .status a.gh:hover{border-color:var(--green); background:rgba(63,240,138,.08); text-decoration:none}
   .pill-tag{border:1px solid var(--line); border-radius:2px; padding:3px 8px; color:var(--green)}
   .dotred::before{content:"\25CF"; color:var(--red); margin-right:6px}
 
@@ -184,10 +189,11 @@
   <div class="status">
     <span class="mark">Morph<b>eus</b></span>
     <span class="pill-tag">vLLM 0.24</span>
-    <span class="sep"></span>
     <span>qwen2.5&#8209;1.5b</span><span>&middot;</span>
-    <span>1&times; Tesla&nbsp;T4</span><span>&middot;</span>
+    <span>1&times; Tesla&nbsp;T4</span>
+    <span class="sep"></span>
     <span class="dotred">red&#8209;pill</span>
+    <a class="gh" href="https://github.com/wuisabel-gif/Morpheus" target="_blank" rel="noopener">GitHub &#8599;</a>
   </div>
 
   <!-- HERO -->
@@ -458,6 +464,7 @@ predicted throughput-optimal concurrency: <span class="g">~48</span>  <span clas
 <span class="prompt">$</span> morpheus certify --raw results/raw   <span class="d"># should you believe it?</span></div>
     <div>Morpheus &middot; measure · certify · predict &middot; <a href="https://github.com/wuisabel-gif/Morpheus">github.com/wuisabel-gif/Morpheus</a></div>
     <div style="color:var(--dim); margin-top:8px">Charts are derived from the committed T4 run. There is no spoon; there is only the distribution.</div>
+    <div style="color:var(--dim); margin-top:14px; border-top:1px solid var(--line); padding-top:16px">&copy; 2026 wuisabel&#8209;gif &middot; MIT&nbsp;License</div>
   </footer>
 
 </div>
